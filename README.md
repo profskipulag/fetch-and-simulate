@@ -1,15 +1,13 @@
 # SS5401 fetch_and_simulate.py
 A package for managing batch runs of Fall3D, in order to generate training data for DT-GEO WP5 DTC4. The package consists of
 
- - an in memory representation of a Fall3D .inp input file for
-  - generating new input files from scratch
-  - reading files and modifying them
-  - writing them to disk
-  - performing type and value checks of file values
-  - plotting geographic extents to check they are correct
-  - automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders
-
-
+ * an in memory representation of a Fall3D .inp input file for
+   * generating new input files from scratch
+   * reading files and modifying them
+   * writing them to disk
+   * performing type and value checks of file values
+   * plotting geographic extents to check they are correct
+   * automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders
 
 
     SS5401/
@@ -45,7 +43,6 @@ A package for managing batch runs of Fall3D, in order to generate training data 
     ├── README.md                               - this file
     ├── fetch_and_simulate.py                   - the script that calls pyf3d to generate input files and runsa Fall3D
     └── test_pyf3d.py                           - unit tests - run with pytest
-
 
 
 ## To download the repository
