@@ -1,5 +1,14 @@
 # SS5401 fetch_and_simulate.py
-Pacakge for managing batch runs of Fall3D, in order to generate training data for DT-GEO WP5 DTC4.
+A package for managing batch runs of Fall3D, in order to generate training data for DT-GEO WP5 DTC4. The package consists of
+
+ - an in memory representation of a Fall3D .inp input file for
+  - generating new input files from scratch
+  - reading files and modifying them
+  - writing them to disk
+  - performing type and value checks of file values
+  - plotting geographic extents to check they are correct
+  - automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders
+
 
 
 
@@ -51,12 +60,12 @@ You will be asked for your username and password. For the password github now re
 - under note give it a name, click "repo" to select al check boxes, then click generate token
 - copy result enter it as password
 
-## To run the juputer notebook
+## To run the jupyter notebook
 Create a new conda environment from the environment.yaml file:
 
-    conda env create -f environment.yml
+    conda env create -f environment.yaml
 
-Activate the enmironment
+Activate the environment
 
     conda activate ss5401
     
@@ -79,4 +88,11 @@ then in the SS5401 directory edit fetch_and_simulate.py to generate random Fall3
 
     sudo docker compose up --build 
     
+Data retrieved from CDS wil be stored in 
+
+    mnt/archive
+    
+Fall3D runs are stored in
+
+    mnt/runs/batch/name/[run0, run1, run2, ..., runN]
   
