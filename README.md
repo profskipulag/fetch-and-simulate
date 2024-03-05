@@ -9,6 +9,8 @@ A package for managing batch runs of Fall3D, in order to generate training data 
    * plotting geographic extents to check they are correct
    * automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders
 
+Future updates will include
+
 
     SS5401/
     ├── docker-compose.yaml                     - orchestrates containers, ports, volumes
