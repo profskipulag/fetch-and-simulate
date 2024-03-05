@@ -9,8 +9,8 @@ RUN conda install -c conda-forge mamba
 COPY environment.yaml /app/environment.yaml
 RUN /bin/bash -c "mamba env create -f /app/environment.yaml"
 COPY pyf3d/ /app/pyf3d/
-COPY script.py /app/script.py
-ENTRYPOINT ["conda", "run", "--no-capture-output", "--cwd","/app","-n", "ss5401","python","script.py"]
+COPY fetch_and_simulate.py /app/fetch_and_simulate.py
+ENTRYPOINT ["conda", "run", "--no-capture-output", "--cwd","/app","-n", "ss5401","python","fetch_and_simulate.py"]
 
 #ENTRYPOINT ["ls","app"]
 #CMD cd fall3d/bin; ./Fall3d.r8.x All /RUNS/Example.inp  > /RUNS/log.txt
