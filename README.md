@@ -79,22 +79,22 @@ Launch the notebook server
 
     jupyter notebook
     
-Navigate to the SS5401 directory and click the file notebook.ipynb to launch it.
+Navigate to the SS5401 directory and click the file `notebook.ipynb` to launch it.
 
 ## To run the docker container
 The user needs to provide two files, a netcdf file of the whole of the west CARRA domain (e.g. orography)
 
     mnt/aux/CARRA_orography_west.nc
     
-which can be easily downloaded from Copernicus Climate Data Center (CDS) here https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-carra-single-levels?tab=form. The software also needs the users CDS API key, stored as .cdsapirc - see https://cds.climate.copernicus.eu/api-how-to for more details .
+which can be easily downloaded from Copernicus Climate Data Center (CDS) here https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-carra-single-levels?tab=form. The software also needs the users CDS API key, stored as `.cdsapirc` - see https://cds.climate.copernicus.eu/api-how-to for more details .
 
     mnt/secrets/.cdsapirc
     
-then in the SS5401 directory edit fetch_and_simulate.py to generate random Fall3D runs of your choice, and run:
+then in the SS5401 directory edit `fetch_and_simulate.py` to generate random Fall3D runs of your choice, and run:
 
     sudo docker compose up --build 
     
-Data retrieved from CDS wil be stored in 
+The directory `mnt` is mounted in to the container from the host filesystem so results will persist and the container finihses. Data retrieved from CDS wil be stored in 
 
     mnt/archive
     
@@ -111,7 +111,7 @@ Activate the environment
 
     conda activate ss5401
     
-Run pytest
+Run `pytest`
 
     pytest test_pyf3d
 
