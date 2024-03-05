@@ -1,16 +1,22 @@
 # SS5401 fetch_and_simulate.py
 A package for managing batch runs of Fall3D, in order to generate training data for DT-GEO WP5 DTC4. The package consists of pyf3d, a package that contains some helper classes, including
 
- * Fall3DInputFile, a class that is an in-memory representation of a Fall3D .inp input file for
+ * `Fall3DInputFile`, a class that is an in-memory representation of a Fall3D.inp input file for
    * generating new input files from scratch
    * reading files and modifying them
    * writing them to disk
    * performing type and value checks of file values
    * various visualisations
- * CARRASource, a class for automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders, and writing the appropriate meteo input data for Fall3D
- * Fall3DBatch, a class that takes a base Fall3D input file and a pandas dataframe of parameter values and generates a large number of runs, one for each row of the dataframe.
+ * `CARRASource`, a class for automatically fetching the appropriate meteodata and managing local storage to prevent spurious orders, and writing the appropriate meteo input data for Fall3D
+ * `Fall3DBatch`, a class that takes a base Fall3D input file and a pandas dataframe of parameter values and generates a large number of runs, one for each row of the dataframe.
 
-The useage of these classes is illustarted in the Jupyter notebook, notebook.ipynb. Future updates will include extra visualisations for Fall3D input files, ERASource, GFSSource, etc..
+The useage of these classes is illustarted in the Jupyter notebook `notebook.ipynb`, and the script `fetch_and_simulate.py` is the application of the library for the purposes of DTC4. 
+
+## To do
+ * visualisations for Fall3D input files
+ * ERASource, GFSSource, etc..
+ 
+## Package structure
 
 
     SS5401/
