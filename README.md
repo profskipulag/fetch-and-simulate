@@ -51,5 +51,32 @@ You will be asked for your username and password. For the password github now re
 - under note give it a name, click "repo" to select al check boxes, then click generate token
 - copy result enter it as password
 
+## To run the juputer notebook
+Create a new conda environment from the environment.yaml file:
+
+    conda env create -f environment.yml
+
+Activate the enmironment
+
+    conda activate ss5401
+    
+Launch the notebook server
+
+    jupyter notebook
+    
+Navigate to the SS5401 directory and click the file notebook.ipynb to launch it.
+
 ## To run the docker container
-The use needs to provide two files, a netcdf file of the whole of the west CARRA domain
+The user needs to provide two files, a netcdf file of the whole of the west CARRA domain (e.g. orography)
+
+    mnt/aux/CARRA_orography_west.nc
+    
+which can be easily downloaded from Copernicus Climate Data Center (CDS) here https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-carra-single-levels?tab=form. The software also needs the users CDS API key, stored as .cdsapirc - see https://cds.climate.copernicus.eu/api-how-to for more details .
+
+    mnt/secrets/.cdsapirc
+    
+then in the SS5401 directory edit fetch_and_simulate.py to generate random Fall3D runs of your choice, and run:
+
+    sudo docker compose up --build 
+    
+  
