@@ -4,38 +4,38 @@ Pacakge for managing batch runs of Fall3D, in order to generate training data fo
 
 
     SS5401/
-    ├── docker-compose.yaml			- orchestrates containers, ports, volumes
-    ├── Dockerfile				- specifies the container that runs the API
-    ├── .dockerignore				- files to be excluded from the build context
-    ├── environment.yaml			- the required python packages
-    ├── .github					- github workflows (coverage, CI, etc.)
+    ├── docker-compose.yaml                     - orchestrates containers, ports, volumes
+    ├── Dockerfile                              - specifies the container that runs the API
+    ├── .dockerignore                           - files to be excluded from the build context
+    ├── environment.yaml                        - the required python packages
+    ├── .github                                 - github workflows (coverage, CI, etc.)
     │   └── workflows
     │       └── python-package.yml
-    ├── .gitignore				- files to be ignored by git (e.g. .cdsapirc)
+    ├── .gitignore                              - files to be ignored by git (e.g. .cdsapirc)
     ├── mnt
-    │   ├── archive				- local storage for reanalysis data from CDS
+    │   ├── archive                             - local storage for reanalysis data from CDS
     │   │   └── README.md
-    │   ├── aux					- extra files needed
-    │   │   ├── CARRA_orography_west.nc		- USER SUPPLIED any CARRA dataset with full lat lon grids for reprojection    
+    │   ├── aux                                 - extra files needed
+    │   │   ├── CARRA_orography_west.nc         - USER SUPPLIED any CARRA dataset with full lat lon grids for reprojection    
     │   │   └── README.md
-    │   ├── examples				- example input files
-    │   │   ├── default_so2_reykjanes.inp	- example input file used for SO2 dispersion
+    │   ├── examples                            - example input files
+    │   │   ├── default_so2_reykjanes.inp       - example input file used for SO2 dispersion
     │   │   ├── README.md
-    │   │   └── stations.pts			- example inpui file specifying station locationsa
-    │   ├── runs				- where the training data will be stored
+    │   │   └── stations.pts                    - example inpui file specifying station locationsa
+    │   ├── runs                                - where the training data will be stored
     │   │   └── README.md
     │   └── secrets
-    │       ├── .cdsapirc			- USER SUPPLIED cdsapi login credentials 
+    │       ├── .cdsapirc                       - USER SUPPLIED cdsapi login credentials 
     │       └── README.md
-    ├── notebook.ipynb				- notebook illustrating example usage (note requires manual setup of environment with conda)
-    ├── pyf3d					- package for manipulating Fall3D input files and generating random batch runs
+    ├── notebook.ipynb                          - notebook illustrating example usage (note requires manual setup of environment with conda)
+    ├── pyf3d                                   - package for manipulating Fall3D input files and generating random batch runs
     │   ├── __init__.py
-    │   ├── fstrings.py				- formatting strings for writing a Fall3D input file
-    │   ├── regex_strings.py			- regex strings for reading a Fall3D input file
-    │   └── source.py				- class deinitions for file sections, the input file, meteo data sources, batch runs
-    ├── README.md				- this file
-    ├── fetch_and_simulate.py			- the script that calls pyf3d to generate input files and runsa Fall3D
-    └── test_pyf3d.py				- unit tests - run with pytest
+    │   ├── fstrings.py                         - formatting strings for writing a Fall3D input file
+    │   ├── regex_strings.py                    - regex strings for reading a Fall3D input file
+    │   └── source.py				- class definitions for file sections, the input file, meteo data sources, batch runs
+    ├── README.md                               - this file
+    ├── fetch_and_simulate.py                   - the script that calls pyf3d to generate input files and runsa Fall3D
+    └── test_pyf3d.py                           - unit tests - run with pytest
 
 
 
