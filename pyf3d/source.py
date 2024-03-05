@@ -1,15 +1,33 @@
+import os
 import re
-from regex_strings import *
-from fstrings import *
+import copy
+import glob
+import cdsapi
+import cfgrib
+import datetime
+import subprocess
+import numpy as np
+import xarray as xr
+import pandas as pd
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+from cartopy.feature import NaturalEarthFeature
+from .regex_strings import *
+from .fstrings import *
 
 
 
 
-# awesome function by 'Anon' : https://stackoverflow.com/a/51981596
-def is_valid_date(year, month, day):
+def is_valid_date(year:int, month:int, day:int)->bool:
+    """Function by 'Anon' that checks a date to see if it exists
+    https://stackoverflow.com/a/51981596 
+    """    
     day_count_for_month = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    
     if year%4==0 and (year%100 != 0 or year%400==0):
         day_count_for_month[2] = 29
+    
     return (1 <= month <= 12 and 1 <= day <= day_count_for_month[month])
 
 
@@ -17,7 +35,7 @@ class YesNo:
     """Class to associate various spellings of "yes" and "no" with True and False
     """
     
-    def __init__(self,val):
+    def __init__(self,val:str|float):
         
         if val in ['YES','Yes','yes']:
             self.bool = True
@@ -62,7 +80,9 @@ class OnOff:
     """Class to associate various spellings of "On" and "Off" with True and False
     """
     
-    def __init__(self,val):
+    def __init__(self,val:str|float):
+        """
+        """
         
         if val in ['ON','On','on']:
             self.bool = True
@@ -90,23 +110,70 @@ class OnOff:
             raise TypeError(val,"not one of On, Off, True, False")
     
     def __repr__(self):
+        """
+        """
         # the value of the OnOff object that is inserted into the fstring
         return(self.val)
     
     def __str__(self):
+        """
+        """
         # the value of the YesNo object that is inserted into the fstring
         return(self.val)
     
     def __bool__(self):
+        """
+        """
         # the value of the OnOff object that is used for logical operations
         return(self.bool)
+
+class Longitude:
+    """Class to remove annoying, hard to debug longitude definition errors
+    """
+
+    def __init__(self, value:float, type:int):
+
+        
+        if type == 360:
+            if value<0:
+                raise TypeError("Longitude cannot be negative when defined 0-360")
+            else:
+                self._360 = value
+                self._180 = (value + 180) % 360 - 180
+
+        if type == 180:
+            if value>180:
+                raise TypeError("Longitude cannot be > 180 when defined -180 to 180")
+            else:
+                self._360 = value %360
+                self._180 = value
+
+
+def Lon360(value:float)->Longitude:
+    """Quicker to type than Longitude(value,360)
+    """
+    return(Longitude(value, 360))
     
+
+def Lon180(value:float)->Longitude:
+    """Quicker to type than Longitude(value, 180)
+    """
+    return(Longitude(value, 180))
+
 
 
 
 
 class Section:
-    """Generic class for a Fall3D input file section.  
+    """Generic class for a Fall3D input file section. 
+    All sections need to be able to do 1 of 3 things:
+    
+    (1) create new from string from valid Fall3D input file
+    (2) write to a string that is a valid part of a Fall3D input file
+    (3) update values while performing all initialization type and value checks all over again
+    
+    plus domain specific visualisations, etc.., which are implemented in the child classes
+    
     """
     @classmethod    
     def from_string(cls,string:str):
@@ -130,6 +197,8 @@ class Section:
         return(cls)
     
     def to_string(self):
+        """
+        """
         
         variables = {}
         
@@ -140,6 +209,37 @@ class Section:
         string = self.fstring.format(**variables)
         
         return(string)
+
+
+    def __repr__(self):
+        """
+        """
+        return(self.to_string())
+
+    def __str__(self):
+        """
+        """
+        return(self.to_string())
+
+
+    def update(self,new_values:dict):
+        """Update witgh values in dict
+        """
+        # createb a dict that wil be used to reinitialise theb object
+        params = {}
+
+        for key, item in self.types.items():
+            
+            params[key] = getattr(self,key)
+
+        for key, item in new_values.items():
+
+            params[key] = item
+
+        self.__init__(**params)
+
+
+        
 
 
 
@@ -357,6 +457,57 @@ class MeteoData(Section):
         self.dbs_end_meteo_data = dbs_end_meteo_data
         self.meteo_coupling_interval = meteo_coupling_interval
         self.memory_chunk_size = memory_chunk_size
+
+    def plot_on_map(self,ax=None):
+
+        if not os.path.exists(self.meteo_data_file):
+            raise OSError("Meteo data file does not exist.")
+
+        ds = xr.open_dataset(self.meteo_data_file)
+
+        # get outline of meteo data
+
+        west_lat = ds.latitude.sel(x=0).values
+        west_lon = ds.longitude.sel(x=0).values
+
+        east_lat = ds.latitude.sel(x=-1).values
+        east_lon = ds.longitude.sel(x=-1).values
+
+        south_lat = ds.latitude.sel(y=0).values
+        south_lon = ds.longitude.sel(y=0).values
+
+        north_lat = ds.latitude.sel(y=-1).values
+        north_lon = ds.longitude.sel(y=-1).values
+        
+        extent = [
+                    ds.longitude.min(), 
+                    ds.longitude.max(),
+                    ds.latitude.min(), 
+                    ds.latitude.max()
+                ]
+
+        
+
+        if ax is None:
+            plt.figure("Test Map")
+            crs = ccrs.PlateCarree()
+            ax = plt.subplot(111, projection=crs)
+            
+            ax.set_extent(extent, crs=crs)
+            
+            #ax.add_feature(NaturalEarthFeature('physical', 'ocean', '50m'))
+            ax.coastlines(resolution='10m',color='blue')
+    
+            ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
+
+        ax.plot(west_lon-360, west_lat, color='blue')
+        ax.plot(east_lon-360, east_lat, color='blue')
+        ax.plot(north_lon-360, north_lat, color='blue')
+        ax.plot(south_lon-360, south_lat, color='blue')
+
+        return(extent)
+        
+        #plt.show()
         
 
 
@@ -472,7 +623,33 @@ class Grid(Section):
         self.nz = nz 
         self.zmax = zmax
         #self.sigma_values =sigma_values
+
+    def plot_on_map(self, ax=None):
+
+        extent = [self.lonmin-1, self.lonmax+1,self.latmin-1, self.latmax+1]
+
+        bbox = np.array([
+                    [self.lonmin, self.latmin], # lower left
+                    [self.lonmin, self.latmax], # upper left
+                    [self.lonmax, self.latmax], # upper right
+                    [self.lonmax, self.latmin], # lower right
+                    [self.lonmin, self.latmin] # back to lower left again
+        ])
+
+
+        if ax == None:
+            plt.figure("Test Map")
+            ax = plt.subplot(111, projection=ccrs.PlateCarree())
+            ax.set_extent(extent, crs=ccrs.PlateCarree())
+            
+            #ax.add_feature(NaturalEarthFeature('physical', 'ocean', '50m'))
+            ax.coastlines(resolution='10m',color='blue')
+    
+            ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
+
+        ax.plot(*bbox.T, color='red')
         
+        #plt.show()
 
 
 
@@ -1037,7 +1214,26 @@ class Source(Section):
         self.c_umbrella = c_umbrella
         self.a_s = a_s
         self.a_v = a_v  
-        
+
+    def plot_on_map(self,ax=None):
+
+
+        if  ax==None:
+            plt.figure("Test Map")
+            ccrs.PlateCarree()
+            crs = ccrs.PlateCarree()
+            extent = [self.lon_vent-1, self.lon_vent+1,self.lat_vent-1, self.lat_vent+1]
+
+            ax = plt.subplot(111, projection=crs)
+            ax.set_extent(extent, crs=crs)
+            
+            #ax.add_feature(NaturalEarthFeature('physical', 'ocean', '50m'))
+            ax.coastlines(resolution='10m',color='blue')
+    
+            ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
+
+        ax.plot([self.lon_vent], [self.lat_vent], marker='o', color='red')
+            
         
         
         
@@ -1605,6 +1801,24 @@ class ModelValidation(Section):
 
 class Fall3DInputFile:
 
+    types = {
+                'time_utc': TimeUTC,
+                'insertion_data': InsertionData,
+                'meteo_data': MeteoData,
+                'grid':Grid,
+                'species':Species,
+                'tephra_tgsd':TephraTgsd,
+                'radionucleides_tgsd':RadionucleidesTgsd,
+                'particle_aggregation':ParticleAggregation,
+                'source':Source,
+                'ensemble':Ensemble,
+                'emsemble_postprocess': EnsemblePostprocess,
+                'model_physics':ModelPhysics,
+                'model_output':ModelOutput,
+                'model_validation':ModelValidation
+        
+    }
+
     def __init__(self,
                 time_utc: TimeUTC,
                 insertion_data: InsertionData,
@@ -1619,7 +1833,8 @@ class Fall3DInputFile:
                 emsemble_postprocess: EnsemblePostprocess,
                 model_physics:ModelPhysics,
                 model_output:ModelOutput,
-                model_validation:ModelValidation
+                model_validation:ModelValidation,
+                file=None
                 ):
         
         assert(type(time_utc)==TimeUTC)
@@ -1651,6 +1866,7 @@ class Fall3DInputFile:
         self.model_physics = model_physics
         self.model_output = model_output
         self.model_validation = model_validation
+        self.file = file
 
 
     @classmethod
@@ -1771,8 +1987,11 @@ class Fall3DInputFile:
             emsemble_postprocess =  emsemble_postprocess,
             model_physics = model_physics,
             model_output = model_output,
-            model_validation = model_validation
+            model_validation = model_validation,
+            file=file
         )
+        
+        
 
         return(f3dif)
 
@@ -1805,20 +2024,729 @@ class Fall3DInputFile:
 
         with open(file,"w+") as f:
             f.writelines(string)
+            
+        self.output_file = file
+
+    def update(self,new_values:dict):
+        """Update with values in dict
+        """
+
+        sections = {}
+
+        # we iterate through each section of the file ....
+        for section_name, section_type in self.types.items():
+            
+            section = getattr(self,section_name)
+
+            
+            # ... for each section of the file we get the current params ...
+        
+            params = {}
+    
+            for attribute_name, attribute_type in section.types.items():
+                
+                params[attribute_name] = getattr(section,attribute_name)
+
+            # ...we then check to see if there are any values in that section to update ...
+            if section_name in new_values.keys():
+
+                # ... and if there are, we update them
+                for name, value in new_values[section_name].items():
+                    params[name] = value
+
+            # ... finally we reinitialise the section with the new params ..
+            section.__init__(**params)
+
+            # ... and append it to our sections dict.
+            sections[section_name] = section
+
+        
+        # ... finally, we reinitialise with the update parameters
+        self.__init__(**sections)
+        
+    def get_meteodata(self):
+        """Fetches Meteo data based on specification in time_utc, grid and meteo_data
+        """
+
+        source = get_MeteoSource(self)
+
+        source.get_fall3d_input(self)
+
+
+    def plot_on_map(self):
+        """Plots meteodata extent, grid extent and source location on a map with a high resolution
+        coastlinbe.
+        """
+
+
+        
+        plt.figure("Test Map")
+        ccrs.PlateCarree()
+        crs = ccrs.PlateCarree()
+        ax = plt.subplot(111, projection=crs)        
+        #ax.add_feature(NaturalEarthFeature('physical', 'ocean', '50m'))
+        ax.coastlines(resolution='10m',color='blue')
+
+        ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
+
+        extent = self.meteo_data.plot_on_map(ax=ax)
+        self.grid.plot_on_map(ax=ax)
+        self.source.plot_on_map(ax=ax)
+
+        ax.set_extent(extent, crs=crs)
         
 
 
-class Vent:
-
-    def __init__(self, lat, lon, Z):
-
-        self.lat = lat
-        self.lon = lon
-        self.Z = Z
 
 
-class RandomSourceGenerator(Source):
 
-    def __init__(self):
-        pass
+
+                             
+
+def get_MeteoSource(file:Fall3DInputFile): #time_utc:TimeUTC, grid:Grid, 
+    """General class to fetch
+    """
+
+    data_format = file.meteo_data.meteo_data_format
+
+    switch = {
+        'WRF':WRFSource,
+        'ERA5':ERA5Source,
+        'GFS':GFSSource,
+        'IFS':IFSSource,
+        'CARRA':CARRASource,
+        'ERA5ML':ERA5MLSource
+    }
+
+    source = switch[data_format]() #time_utc, grid, meteo_data
+
+    return(source)
+        
+class ERA5MLSource:
+
+    def __init__(self):#,time_utc:TimeUTC, grid:Grid, meteo_data:MeteoData):
+        raise NotImplementedError
+
+class ERA5Source:
+
+    def __init__(self):#,time_utc:TimeUTC, grid:Grid, meteo_data:MeteoData):
+        raise NotImplementedError
+
+class WRFSource:
+
+    def __init__(self):#,time_utc:TimeUTC, grid:Grid, meteo_data:MeteoData):
+        raise NotImplementedError
+
+class GFSSource:
+
+    def __init__(self):#,time_utc:TimeUTC, grid:Grid, meteo_data:MeteoData):
+        raise NotImplementedError
+
+
+class IFSSource:
+
+    def __init__(self):#,time_utc:TimeUTC, grid:Grid, meteo_data:MeteoData):
+        raise NotImplementedError
+
+class CARRASource:
+    
+    # we need a file on the full native CARRA West domain grid
+    # so that we have the latitude and longitude grids, as well
+    # as the projection information in the attributes to hand
+    #file_native = "/media/talfan/Maxtor/test_interpolated.nc"
+    file_native = "mnt/aux/CARRA_orography_west.nc"
+
+    
+    def __init__(self, local_storage="mnt/archive/"):
+        
+        self.ds_native = xr.open_mfdataset(self.file_native)['orog'].drop(['time','step','surface','valid_time'])
+        self.local_storage = local_storage
+
+    def get_fall3d_input(self, file:Fall3DInputFile):
+        """
+        """
+        
+        time_utc = file.time_utc
+        grid = file.grid
+        meteo_data = file.meteo_data
+        
+        if os.path.exists(meteo_data.meteo_data_file):
+        	raise ValueError("File already exists: "+meteo_data.meteo_data_file)
+
+        # get extent from Grid object
+        latmax = grid.latmax
+        latmin = grid.latmin
+        # remember! Longitudes are specified -180 to 180 in a grid object
+        lonmax = Longitude(grid.lonmax,180)
+        lonmin = Longitude(grid.lonmin,180)
+
+        # get time info from TimeUTC object ...
+        year = time_utc.year
+        month = time_utc.month
+        day = time_utc.day
+        run_start = time_utc.run_start
+        run_end = time_utc.run_end
+
+        
+        # ... convert to start and end datetimes ...
+        start = datetime.datetime(year=year,month=month,day=day,hour=run_start)
+        
+        duration = run_end-run_start
+        
+        end = start + datetime.timedelta(hours=duration)
+
+        # ... and get the months we need to order.
+        # Fuirst, we get the difference between the two dates in seconds 
+        # by differencing the unix timestamps ...
+        seconds = (end.timestamp()-start.timestamp())
+
+        # .. which we convert to decimal days ...
+        days = seconds/(24*60*60)
+
+        # ... round up to the nearest whole day ...
+        days = np.ceil(days)
+
+        # .. then convert to int for iterating over ...
+        days = int(days)
+        
+        # ... to get a list of all daily dates between the start and end date ...
+        months = []
+        for day in range(days):
+            date = start + datetime.timedelta(days=day)
+
+            # ... and for each date we save the year and month ...
+            months.append((date.year,date.month))
+
+        # .. so that by performiung a set operation we can get the uniuque
+        # year month pairs we need to order using the cdsapi ...
+        months = set(months)
+
+        # ... we order the data to get a list of datasets ...
+        ds_months = [self.get_month(lonmin, lonmax, latmin, latmax, year, month) for year, month in months]
+
+        # .. which we concatenate into a single one
+        ds = xr.concat(ds_months,dim='time')
+
+        # SUBSET BY DATE HERE!!!!
+
+        # write to the file specified in the meteo_data section
+        ds.to_netcdf(meteo_data.meteo_data_file)
+
+        return(ds)
+    
+ 
+        
+    def get_month(self,lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int):
+        """NOTE! We order by the month due to CDSAPI putting orders longer than a month
+         to the back of the queue!!!
+         """
+        # first we check local storage to see if we already have a file for that
+        # year and month that covers our spatial extent
+        
+        file = self.check_local_storage(lonmin, lonmax, latmin, latmax, year, month)
+        
+        if file is None:
+            print("No appropriate file found in local storage for ",year, month, lonmin._180, lonmax._180, latmin,latmax)
+            print("Submitting order to CDSAPI")
+            file = self.make_request(lonmin, lonmax, latmin, latmax, year, month)
+            
+        else:
+            print("Local file found:",file)
+        ds = xr.open_dataset(file)
+        
+        return(ds)
+            
+
+    def get_local_storage(self):
+        
+        # search for netcdfs in the local archive
+        files = glob.glob("mnt/archive/*.nc")
+
+        # if there are no .nc files, we return an empty dataframe ..
+        if len(files) ==0:
+            
+            df = pd.DataFrame(columns=['file','year','month','lonmin','lonmax','latmin','latmax'])
+
+        # ... otherwise we populate the dataframe with dates and extents
+        else:
+            
+            data = [re.findall(r"(.*(\d{4})(\d{2})_(.+)_(.+)_(.+)_(.+)__CARRA\.nc)",file)[0]  for file in files]    
+
+            df = pd.DataFrame(
+                data, 
+                columns=['file','year','month','lonmin','lonmax','latmin','latmax']
+            )
+
+            df['year'] = df['year'].astype(int)
+            df['month'] = df['month'].astype(int)
+            df['lonmin'] = df['lonmin'].astype(float)
+            df['lonmax'] = df['lonmax'].astype(float)
+            df['latmin'] = df['latmin'].astype(float)
+            df['latmax'] = df['latmax'].astype(float)
+
+        return(df)
+
+    
+            
+    
+    
+    def check_local_storage(self,lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int):
+        """Check to see if we already have a file that matches the request
+        """
+       
+        df = self.get_local_storage()
+
+        # if there are no files we wil return None, otherwise ...
+        if len(df)==0:
+            
+            file = None
+
+        # we check to see if we have a file that meets our requirements:
+        else:
+        
+            check = (
+                    lambda r: 
+                        (r['year']== year)&
+                        (r['month']== month)&
+                        (r['lonmin']<= lonmin._360)&
+                        (r['lonmax']>= lonmax._360)&
+                        (r['latmin']<= latmin)&
+                        (r['latmax']>= latmax)
+                        )
+    
+            df['match'] = df.apply(check, axis=1)
+
+            df_match = df[df['match']]
+
+            # if there is 1 or more files that meets our requirements we will return the first one ...
+            if len(df_match)>=1:
+                file = df_match['file'].item()
+
+            # ... otherwise we return None as before
+            else:
+                file = None
+        
+            
+        return(file)
+
+      
+    
+    def basic_request(self, lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int)->dict:
+        """Gets the part of the cdsapi request dict that is common to both single and pressure level
+        requests.
+        """
+        #print(lonmin._180)
+        #print(lonmin._360)
+        
+        self.lonmin = lonmin
+        self.lonmax = lonmax
+        self.latmin = latmin
+        self.latmax = latmax
+        self.year = year
+        self.month = month
+        
+        # then we get the filenames we will use - NOTE we use 0-360 long here
+        self.filename = "_".join([
+                str(year) + str(month).zfill(2),
+                str(self.lonmin._360),
+                str(self.lonmax._360),
+                str(self.latmin),
+                str(self.latmax),
+                '_CARRA.nc'
+            ])
+        
+        
+        
+        # a visualisation of the problem:
+        # we need to order a CARRA subset 
+        # specified in lat lon (outer box) 
+        # big enough to contain the extent
+        # in CARRA x-y coordinates (middle box)
+        # that encompasse our domain of interest
+        # (inner box)
+        #
+        #    *-----------------------*
+        #    |       *               |
+        #    |      +   +            |        
+        #    |     +       +         |
+        #    |    +*----------*      |    
+        #    |   + |          |  +   |
+        #    |  +  |          |    * |   
+        #    | +   |          |   +  |  
+        #    |*    |          |  +   |   
+        #    |  +  *----------* +    |     
+        #    |     +           +     |             
+        #    |        +       +      |          
+        #    |           +   +       |      
+        #    |              *        |         
+        #    *-----------------------*
+        #
+        
+        
+        # In other words, we need the range of lat lon to order from cdsapi, that
+        # encompases a box in native grid (x,y) that in turn
+        # encmopases the range of lat lon we want for Fall3D. It's complicated!
+        # (native lon is 0-360)
+        domain_xy=(
+                    (self.ds_native.latitude>latmin)&
+                    (self.ds_native.latitude<latmax)&
+                    (self.ds_native.longitude>lonmin._360)&
+                    (self.ds_native.longitude<lonmax._360)
+                    )
+        
+        # we get the min and max x and y values
+        # we will use to clip the data we download after
+        # we order it
+        xs = np.where(domain_xy.values.any(axis=0))[0]
+        xmin = xs.min()
+        xmax = xs.max()
+
+        ys = np.where(domain_xy.values.any(axis=1))[0]
+        ymin = ys.min()
+        ymax = ys.max()
+        
+        # we buffer these values to be on the safe side
+        xmin -= 2
+        xmax += 2
+        ymin -= 2
+        ymax += 2
+
+        # Now, we need to find a range of (lat, lon) values
+        # that completely enclose this range of xy values
+
+        domain_xy = domain_xy.sel(x=slice(xmin, xmax),y=slice(ymin, ymax))
+        
+        # we need to save domain_xy for resampling later
+        self.domain_xy = domain_xy
+
+        latmax_for_cdsapi = domain_xy.latitude.max().values.item()
+        latmin_for_cdsapi = domain_xy.latitude.min().values.item()
+        # longitude goes 0-360 here for some reason
+        lonmax_for_cdsapi = Longitude( domain_xy.longitude.max().values.item(), 360)
+        lonmin_for_cdsapi = Longitude(domain_xy.longitude.min().values.item(),360)
+
+        # buffer the cdsapi bounds by 0.1 of a degree just in case
+        latmax_for_cdsapi += 0.1 
+        latmin_for_cdsapi -= 0.1 
+        lonmax_for_cdsapi = Longitude( lonmax_for_cdsapi._360 + 0.1, 360)
+        lonmin_for_cdsapi = Longitude( lonmin_for_cdsapi._360 - 0.1, 360)
+
+        # finally, remember that longitude for cdsapi is -180-180, not 0-360
+        #lon360_to_180 = lambda lon:( lon + 180) % 360 - 180
+        #lonmax_for_cdsapi = lon360_to_180(lonmax_for_cdsapi)
+        #lonmin_for_cdsapi = lon360_to_180(lonmin_for_cdsapi)
+
+        # the subset area for cdsapi is specified like this
+        # NOTE! lon is specified -180 - 180 here
+        area = [latmax_for_cdsapi, lonmin_for_cdsapi._180, latmin_for_cdsapi, lonmax_for_cdsapi._180 ]
+        
+        # now we need to specify the resolution
+        # this needs to be a number in degrees that is the result of dividing
+        # 90 by an integer:
+        num_samples_in_90_degrees = 3000
+
+        resolution = 90/num_samples_in_90_degrees
+
+        # we need the number of days in the month, which we find by subtracting
+        # the 1st of the next month from the 1st of the current month
+        start = datetime.datetime(year=year,month=month,day=1)
+
+        if month==12:
+            end = datetime.datetime(year=year+1,month=1,day=1)
+        else:
+            end = datetime.datetime(year=year,month=month+1,day=1)
+
+        days_in_month = (end-start).days
+
+        days = [day for day in range(1,days_in_month+1)]
+
+
+        # now we turn all the date integers to strings
+        day = [str(day).zfill(2) for day in days]
+
+        year = str(year)
+
+        month = str(month).zfill(2)
+
+        # we always get all three hourly data for every day
+        # these will never change
+        time =[
+                    '00:00', '03:00', '06:00',
+                    '09:00', '12:00', '15:00',
+                    '18:00', '21:00',
+                ]
+
+
+        # ... we will make two requests, one for 
+        basic_request= {
+            'format': 'grib',
+            'domain': 'west_domain',
+            'format': 'grib',
+            'product_type': 'analysis',
+            'grid':[resolution,resolution],
+            'area': area,
+            'time': time,
+            'year': year,
+            'month': month,
+            'day': day
+        }
+        
+        return(basic_request)
+    
+    def levels_request(self, lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int)->dict:
+        
+        levels_request = self.basic_request(lonmin, lonmax, latmin, latmax, year, month)
+        
+        levels_request['variable'] = [
+                    'geometric_vertical_velocity','geopotential', 
+                    'relative_humidity', 'temperature',
+                    'u_component_of_wind', 'v_component_of_wind',
+                ]
+        
+        levels_request['pressure_level'] = [
+                                                '800', '825', '850',
+                                                '875', '900', '925',
+                                                '950', '1000',
+                                            ]
+        
+        return(levels_request)
+        
+
+    def single_request(self, lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int)->dict:
+    
+        single_request = self.basic_request(lonmin, lonmax, latmin, latmax, year, month)
+        
+        single_request['variable']= [
+                    '10m_u_component_of_wind', '10m_v_component_of_wind', '2m_relative_humidity',
+                    '2m_temperature', 'land_sea_mask',
+                     'orography', 'surface_pressure', 'surface_roughness'
+                ]
+        
+        single_request['level_type']= 'surface_or_atmosphere'
+        
+        return(single_request)
+    
+    def make_request(self, lonmin:Longitude, lonmax:Longitude, latmin:float, latmax:float, year:int, month:int):
+        
+        # first we check to see if we already have the data
+        #file = local_storage(self,lonmin, lonmax, latmin, latmax, year, month)
+        
+        #if file is None:
+        #    return(file)
+                             
+        # first we get the requests dicts
+        levels_request = self.levels_request(lonmin, lonmax, latmin, latmax, year, month)
+        
+        single_request = self.single_request(lonmin, lonmax, latmin, latmax, year, month)
+        
+        # then we get the path to store the data
+        path = os.path.join(self.local_storage, self.filename)
+        
+        # now we order the data. First we initialise the cdsapi client ...
+
+        c = cdsapi.Client()
+
+        # and we make the two requests
+        c.retrieve(
+            'reanalysis-carra-pressure-levels',
+            levels_request,
+            'pressure_levels.grib')
+
+        c.retrieve(
+            'reanalysis-carra-single-levels',
+            single_request,
+            'single_levels.grib')
+        
+        # Once we have the two gribs, we open them as xarray datasets ...
+        gribs_as_ds = cfgrib.open_datasets('single_levels.grib')
+        
+        gribs_as_ds += cfgrib.open_datasets('pressure_levels.grib')
+
+        # ... and iterate over them, interpolating them back to the CARRA grid
+        # from the lat lon subset we we have ordered, so Fall3D can use it ...
+        dss = []
+
+        for i,ds in enumerate(gribs_as_ds):
+
+            # resample
+            ds_resampled = (
+                            ds
+                            .interp({
+                                'latitude':self.domain_xy.latitude,
+                                'longitude':self.domain_xy.longitude
+                                    })
+                            .drop(['surface','heightAboveGround'],errors='ignore')
+                            )
+
+
+            dss.append(ds_resampled)
+            
+        # ... merge the resampled datasets ...
+        ds = xr.merge(dss)
+        
+        # ... and add the projection information back
+        for name in ds:
+            #ds[name].attrs = ds_works[name].attrs
+            ds[name].attrs['GRIB_gridType']= 'lambert'
+            ds[name].attrs['GRIB_gridDefinitionDescription']= 'Lambert conformal '
+            ds[name].attrs['GRIB_LaDInDegrees'] = 72.0
+            ds[name].attrs['GRIB_LoVInDegrees'] = 324.0
+            ds[name].attrs['GRIB_DyInMetres']= 2500.0
+            ds[name].attrs['GRIB_DxInMetres'] = 2500.0
+            ds[name].attrs['GRIB_Latin2InDegrees'] = 72.0
+            ds[name].attrs['GRIB_Latin1InDegrees']= 72.0
+            #ds[name].attrs['GRIB_latitudeOfSouthernPoleInDegrees'] = 0.0
+            #ds[name].attrs['GRIB_longitudeOfSouthernPoleInDegrees'] = 0.0
+            
+        ds.to_netcdf(path)
+        
+        return(path)
+
+
+class Fall3DBatch:
+
+    def __init__(self, name:str, basefile:str|Fall3DInputFile, df:pd.DataFrame, basedir="mnt/runs"):
+        """Initialise a new batch run object
+        """
+
+        # name has to be a valid directory name
+        # https://stackoverflow.com/questions/59672062/elegant-way-in-python-to-make-sure-a-string-is-suitable-as-a-filename
+        ok = ".-_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        
+        if not all([ c in ok for c in name]):
+            raise TypeError("Name variable contains characters illegal in a path")
+        
+        
+        self.name = name
+        self.basefile = basefile
+        self.df = df
+        self.basedir = basedir
+
+    def initialise(self):
+        """Initialise a new batch run - create directories
+        """
+
+        # make the path that will itself contain a directory for each run
+        self.path = os.path.join(self.basedir,self.name)
+        
+        # we don't want to risk overwriting previous batch runs by accident
+        if os.path.isdir(self.path):
+        	raise ValueError("Path already exists for batch name: "+self.name)
+        
+        os.mkdir(self.path)
+        
+
+        # save the dataframe containing the specification for each run
+        self.df_file = os.path.join(self.path, self.name+".csv")
+        
+        if os.path.exists(self.df_file):
+        	raise ValueError("File already exists for batch name: "+self.name)
+        
+        self.df.to_csv(self.df_file)
+
+        # create directory and input file for each run
+        self.input_files = []
+        
+        # each run is a row in the dataframe, so we iterate over them...
+        for i, r in self.df.iterrows():
+            
+            # ... convert each row to a dict ...
+            rdict =r.to_dict()
+
+            # ... now the update function for a Fall3DinputFile object
+            # takes a nexted dict, with one subdict for each sectiom.
+            # So we restructure the row dict into a nested dict:
+            update = {}
+            
+            for key, value in rdict.items():
+            
+                section, attribute = key.split('.')
+                
+                if section in update.keys():
+            
+                    update[section][attribute] = value
+            
+                else:
+                    update[section] = {attribute:value}
+
+            # now we have our nested dict, we make a copy of our base file
+            # and update it with the new values. This reinitialises the object
+            # so any update that is of wrong type / invalid value / clashes with
+            # another setting in the inputfile should be caught
+        
+            newf = copy.deepcopy(self.basefile)
+        
+            newf.update(update)
+
+            # now we need the folder to store this run in.
+            # This is just the basepath we defined earlier
+            # plus the uuid, which is the indes of our row, i:
+        
+            new_dir = os.path.join(self.path,i)
+            
+            if os.path.isdir(new_dir):
+            	raise ValueError("Path already exists: "+new_dir)
+            
+            os.mkdir(new_dir)
+            
+            # and then save the Fall3D input file to that folder:
+            input_file = os.path.join(new_dir,i+".inp")
+            
+            if os.path.exists(input_file):
+            	raise ValueError("File already exists: "+input_file)
+            
+            newf.to_file(input_file)
+
+            # save input file
+            self.input_files.append(input_file)
+
+    def get_meteo_data(self):
+        """
+        """
+
+        for file in tqdm(self.input_files):
+
+            f3if = Fall3DInputFile.from_file(file)
+            
+            meteosource = get_MeteoSource(f3if)
+        
+            meteosource.get_fall3d_input(
+                    #time_utc=f3if.time_utc, 
+                    #grid=f3if.grid, 
+                    #meteo_data=f3if.meteo_data
+                    f3if
+                )
+
+    def run(self):
+
+        for file in tqdm(self.input_files):
+
+            subprocess.run([path_fall3d, "ALL",file]) 
+            
+            
+    def get_meteo_and_run(self): 
+    
+    	for file in tqdm(self.input_files):
+            f3if = Fall3DInputFile.from_file(file)
+            
+            print("********************************************************************")
+            print("FETCHING METEO DATA")
+            print("********************************************************************")
+            meteosource = get_MeteoSource(f3if)
+            
+            print("********************************************************************")
+            print("RUN FALL3D")
+            print("********************************************************************")
+        
+            meteosource.get_fall3d_input(
+                    #time_utc=f3if.time_utc, 
+                    #grid=f3if.grid, 
+                    #meteo_data=f3if.meteo_data
+                    f3if
+                )
+                
+            subprocess.run(["/fall3d/bin/Fall3d.r8.x", "All",file]) 
+
+            
+
 

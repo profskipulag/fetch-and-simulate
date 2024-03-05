@@ -1,0 +1,13 @@
+version: '1'
+services:
+  fall3d:
+    build: .
+    volumes:
+      - "./mnt/archive:/app/mnt/archive"
+      - "./mnt/runs:/app/mnt/runs"
+      - "./mnt/aux:/app/mnt/aux"
+      - "./mnt/examples:/app/mnt/examples"
+      - "./mnt/secrets:/root/"
+    #ports:
+    #  - "80:80"
+    
