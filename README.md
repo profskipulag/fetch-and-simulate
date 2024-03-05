@@ -3,7 +3,7 @@ A package for managing batch runs of Fall3D, in order to generate training data 
 
  * `Fall3DInputFile`, a class that is an in-memory representation of a Fall3D.inp input file for
    * generating new input files from scratch
-   * reading files and modifying them
+   * reading existing files and modifying them
    * writing them to disk
    * performing type and value checks of file values
    * various visualisations
