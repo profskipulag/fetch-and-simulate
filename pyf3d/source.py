@@ -12,9 +12,12 @@ import pandas as pd
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from cartopy.feature import NaturalEarthFeature
-from .regex_strings import *
 from .fstrings import *
+from .regex_strings import *
+from multiprocessing.pool import ThreadPool
+from cartopy.feature import NaturalEarthFeature
+
+
 
 
 
@@ -2605,7 +2608,7 @@ class CARRASource:
 
 class Fall3DBatch:
 
-    def __init__(self, name:str, basefile:str|Fall3DInputFile, df:pd.DataFrame, basedir="mnt/runs"):
+    def __init__(self, name:str, basefile:str|Fall3DInputFile, df:pd.DataFrame, basedir="mnt/runs",n_parallel = 5):
         """Initialise a new batch run object
         """
 
@@ -2621,6 +2624,7 @@ class Fall3DBatch:
         self.basefile = basefile
         self.df = df
         self.basedir = basedir
+        self.n_parallel = n_parallel
 
     def initialise(self):
         """Initialise a new batch run - create directories
@@ -2717,11 +2721,52 @@ class Fall3DBatch:
                     f3if
                 )
 
-    def run(self):
+    def oldrun(self):
+    
+
 
         for file in tqdm(self.input_files):
 
             subprocess.run([path_fall3d, "ALL",file]) 
+            
+    def run(self):
+        
+
+        processes = { }
+
+        files = copy.deepcopy(self.input_files)
+
+        # initialise first n_parallel runs
+        for i in range(self.n_parallel):
+            file = files.pop()
+            processes[i] = subprocess.Popen(["/fall3d/bin/Fall3d.r8.x","All",file])
+
+        # while there is more than 1 file left ....
+        while len(files)>0:
+        
+            # ... iterate over each parallel slot ...
+            for i, p in processes.items():
+            
+                # ... and when that run has finished ...
+                if p.poll() is not None:
+                
+                    # ... get the next run in the list ...
+                    file = files.pop()
+                    
+                    #print(len(files))
+                    # ... put it in that slot and start it ...
+                    processes[i] = subprocess.Popen(["/fall3d/bin/Fall3d.r8.x","All",file])
+            
+        # ... and once we've used up all the files we just need to wait until the last one is finished
+        finished = False
+       
+        while not finished:
+       
+            # the batch is finished when all of the last Popen objects stop returning None
+            finished  = all([(p.poll() is not None) for i, p in processes.items()])
+           
+        print("Batch completed")
+       
             
             
     def get_meteo_and_run(self): 

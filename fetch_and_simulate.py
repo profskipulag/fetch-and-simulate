@@ -35,7 +35,7 @@ f3if.update({
 		})
 
 # decide how many training samples we want
-size= 100
+size= 20
 
 # Get random starting dates
 start_date = datetime.datetime(year=1991,month=1,day=1)
@@ -96,9 +96,9 @@ batch = Fall3DBatch(name=name, basefile=f3if, df=df, basedir="mnt/runs")
 
 batch.initialise()
 
-batch.get_meteo_and_run()
+batch.get_meteo_data()
 
-#batch.run()
+batch.run()
 
  
  
