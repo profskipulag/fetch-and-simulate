@@ -2608,9 +2608,12 @@ class CARRASource:
 
 class Fall3DBatch:
 
-    def __init__(self, name:str, basefile:str|Fall3DInputFile, df:pd.DataFrame, basedir="mnt/runs",n_parallel = 5):
+    def __init__(self, name:str, basefile:str|Fall3DInputFile, df:pd.DataFrame, basedir="mnt/runs",n_parallel = 5, 
+    fall3d_path="/fall3d/bin/Fall3d.r8.x"):
         """Initialise a new batch run object
         """
+        
+        self.fall3d_path = fall3d_path
 
         # name has to be a valid directory name
         # https://stackoverflow.com/questions/59672062/elegant-way-in-python-to-make-sure-a-string-is-suitable-as-a-filename
@@ -2739,7 +2742,7 @@ class Fall3DBatch:
         # initialise first n_parallel runs
         for i in range(self.n_parallel):
             file = files.pop()
-            processes[i] = subprocess.Popen(["/fall3d/bin/Fall3d.r8.x","All",file])
+            processes[i] = subprocess.Popen([self.fall3d_path,"All",file])
 
         # while there is more than 1 file left ....
         while len(files)>0:
@@ -2755,7 +2758,7 @@ class Fall3DBatch:
                     
                     #print(len(files))
                     # ... put it in that slot and start it ...
-                    processes[i] = subprocess.Popen(["/fall3d/bin/Fall3d.r8.x","All",file])
+                    processes[i] = subprocess.Popen([self.fall3d_path,"All",file])
             
         # ... and once we've used up all the files we just need to wait until the last one is finished
         finished = False
@@ -2790,7 +2793,7 @@ class Fall3DBatch:
                     f3if
                 )
                 
-            subprocess.run(["/fall3d/bin/Fall3d.r8.x", "All",file]) 
+            subprocess.run([self.fall3d_path, "All",file]) 
 
             
 
